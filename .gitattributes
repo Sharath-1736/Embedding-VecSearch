@@ -1,0 +1,8 @@
+# Handle line endings consistently
+* text=auto
+
+# Always use LF for code, so it's consistent across platforms
+*.py text eol=lf
+*.ipynb text eol=lf
+*.md text eol=lf
+*.txt text eol=lf

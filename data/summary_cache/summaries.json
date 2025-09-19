@@ -1,0 +1,52 @@
+{
+  "c45c032688a9962f212b928aeef7fdd8": {
+    "summary": "Quantum machine learning represents an emerging field that combines quantum computing principles with machine learning algorithms.",
+    "timestamp": "2025-09-14T17:00:32.558860",
+    "title": "Quantum Machine Learning: Bridging Quantum Computing and Artificial Intelligence"
+  },
+  "bc6d5c52192503cbb82067b601a9ea8c": {
+    "summary": "Financial risk assessment requires not only accurate predictions but also interpretable explanations for regulatory compliance and decision transparency.",
+    "timestamp": "2025-09-14T17:00:35.111220",
+    "title": "Explainable AI for Financial Risk Assessment: Interpretable Machine Learning Models"
+  },
+  "260d8667979ecec3739a784c57b6de39": {
+    "summary": "Healthcare data is inherently sensitive and distributed across multiple institutions. Federated learning offers a solution for collaborative machine learning without centralizing patient data.",
+    "timestamp": "2025-09-14T17:00:35.514321",
+    "title": "Federated Learning for Privacy-Preserving Healthcare Analytics"
+  },
+  "5eea025ea87cfdd15554578126e7496d": {
+    "summary": "Predicting molecular properties is crucial for drug discovery and materials science. Graph neural networks provide a natural framework for representing molecular structures as graphs.",
+    "timestamp": "2025-09-14T17:00:35.903414",
+    "title": "Graph Neural Networks for Molecular Property Prediction"
+  },
+  "a9146d570bcaaca06592821c1d5d9f17": {
+    "summary": "Climate modeling faces unprecedented computational challenges due to the complexity and scale of Earth system processes.",
+    "timestamp": "2025-09-14T17:00:36.309789",
+    "title": "Deep Learning for Climate Modeling: Challenges and Opportunities"
+  },
+  "0780aa5fe7f774d66f6cb0f5a2535719": {
+    "summary": "The exponential growth of scientific literature necessitates automated methods for knowledge extraction and analysis.",
+    "timestamp": "2025-09-14T17:00:36.707129",
+    "title": "Natural Language Processing for Scientific Literature Mining: Methods and Applications"
+  },
+  "9ecb3d138f00ab548bd54803159b1e2b": {
+    "summary": "Attention mechanisms have revolutionized deep learning by enabling models to focus on relevant parts of input sequences.",
+    "timestamp": "2025-09-14T17:00:37.128163",
+    "title": "Attention Mechanisms in Deep Learning: A Comprehensive Survey"
+  },
+  "29388db498af2060e919c40dd4d09a0d": {
+    "summary": "Vision transformers have shown remarkable success in natural image analysis, but their application to medical image segmentation remains underexplored.",
+    "timestamp": "2025-09-14T17:00:37.487379",
+    "title": "Vision Transformers for Medical Image Segmentation: A Systematic Study"
+  },
+  "1e215318b25d0a883133390ae7d82d8f": {
+    "summary": "Autonomous vehicle navigation in complex urban environments requires sophisticated decision-making capabilities.",
+    "timestamp": "2025-09-14T17:00:37.870249",
+    "title": "Reinforcement Learning for Autonomous Vehicle Navigation in Urban Environments"
+  },
+  "3915e9b64b5a0d8b403c3d28921bb61d": {
+    "summary": "Effective human-robot interaction requires robots to understand and respond to multiple communication modalities simultaneously.",
+    "timestamp": "2025-09-14T17:00:38.282325",
+    "title": "Multimodal Learning for Human-Robot Interaction: Integrating Vision, Speech, and Gesture"
+  }
+}

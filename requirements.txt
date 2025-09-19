@@ -1,0 +1,35 @@
+# Core dependencies
+numpy>=2.1.1
+pandas>=2.2.2
+scikit-learn>=1.5.2
+
+# Vector search and embeddings
+faiss-cpu>=1.9.0
+sentence-transformers>=3.0.1
+transformers>=4.44.2
+torch>=2.4.1
+
+# Data processing
+nltk>=3.9.1
+spacy>=3.7.6
+tqdm>=4.66.5
+
+# Generative AI (OpenAI + Hugging Face)
+openai>=1.43.0
+accelerate>=1.0.1
+
+# Web interface
+streamlit>=1.39.0
+plotly>=5.24.1
+
+# Utilities
+python-dotenv>=1.0.1
+requests>=2.32.3
+beautifulsoup4>=4.12.3
+
+# JSON processing
+ijson>=3.3.0
+
+# Optional: For advanced preprocessing
+textblob>=0.18.0
+langdetect>=1.0.9
