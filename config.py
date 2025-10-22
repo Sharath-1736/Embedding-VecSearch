@@ -22,7 +22,7 @@ for dir_path in [DATA_DIR, MODELS_DIR, INDEX_DIR]:
 # Dataset configuration
 ARXIV_DATASET_PATH = DATA_DIR / "arxiv-metadata-oai-snapshot.json"
 PROCESSED_DATA_PATH = DATA_DIR / "processed_papers.pkl"
-SAMPLE_SIZE = 50000  # Set to None to process all papers
+SAMPLE_SIZE = None  # CHANGED: Set to None to process ALL papers (was 1000)
 
 # Embedding configuration
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # Correct
@@ -40,7 +40,7 @@ N_CLUSTERS = 1000  # For IVF index
 N_PROBE = 50  # Search parameter for IVF
 
 # Search configuration
-TOP_K_RESULTS = 10
+TOP_K_RESULTS = 1
 SIMILARITY_THRESHOLD = 0.5
 
 # ====== AI SUMMARY CONFIGURATION ======
@@ -67,7 +67,7 @@ BATCH_SUMMARY_MAX_TOKENS = 300  # Max tokens for batch summaries
 BATCH_SUMMARY_TEMPERATURE = 0.8
 
 # Cost Management
-MAX_SUMMARIES_PER_SEARCH = 10  # Limit summaries to control costs
+MAX_SUMMARIES_PER_SEARCH = 5  # Limit summaries to control costs
 ENABLE_SUMMARY_CACHING = True  # Cache summaries to avoid regeneration
 SUMMARY_CACHE_DIR = DATA_DIR / "summary_cache"
 SUMMARY_CACHE_DIR.mkdir(exist_ok=True)
@@ -105,17 +105,21 @@ MAX_ABSTRACT_LENGTH = 2000
 LANGUAGE_FILTER = "en"  # Only English papers
 
 # Categories to include (ArXiv categories)
-INCLUDED_CATEGORIES = [
-    "cs.AI", "cs.CL", "cs.CV", "cs.LG", "cs.NE", "cs.RO",  # Computer Science
-    "stat.ML",  # Statistics - Machine Learning
-    "math.ST", "math.PR", "math.OC",  # Mathematics
-    "physics.data-an", "physics.comp-ph",  # Physics
-    "q-bio.QM", "q-bio.GN"  # Quantitative Biology
-]
+# CHANGED: Empty list means NO category filtering - include ALL categories
+INCLUDED_CATEGORIES = []
+
+# Original category filter (for reference if you want to re-enable later):
+# INCLUDED_CATEGORIES = [
+#     "cs.AI", "cs.CL", "cs.CV", "cs.LG", "cs.NE", "cs.RO",  # Computer Science
+#     "stat.ML",  # Statistics - Machine Learning
+#     "math.ST", "math.PR", "math.OC",  # Mathematics
+#     "physics.data-an", "physics.comp-ph",  # Physics
+#     "q-bio.QM", "q-bio.GN"  # Quantitative Biology
+# ]
 
 # Streamlit configuration
-APP_TITLE = "Re-Search  with AI Summaries"
-APP_DESCRIPTION = "Search through 1.7M+ research papers using semantic similarity and get AI-powered summaries"
+APP_TITLE = "Re-Search: AI-Powered Paper Finder"
+APP_DESCRIPTION = "Search through thousands of research papers using semantic similarity and get AI-powered summaries"
 PAGE_SIZE = 20
 
 # Display Configuration
