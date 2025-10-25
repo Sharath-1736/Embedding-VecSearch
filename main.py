@@ -1,5 +1,6 @@
 """
 Command Line Interface for ArXiv Vector Search System
+Enhanced with incremental update capability
 """
 import argparse
 import sys
@@ -28,6 +29,7 @@ def setup_cli():
 Examples:
   python main.py process --sample-size 10000
   python main.py build-index
+  python main.py update
   python main.py search "machine learning neural networks"
   python main.py search "quantum computing" --top-k 20 --export json
   python main.py similar-papers 2201.12345
@@ -55,6 +57,11 @@ Examples:
                              help=f'FAISS index type (default: {config.FAISS_INDEX_TYPE})')
     build_parser.add_argument('--force', action='store_true',
                              help='Force rebuilding even if index exists')
+    
+    # Update command (NEW!)
+    update_parser = subparsers.add_parser('update', help='Incrementally update index with new papers')
+    update_parser.add_argument('--force-rebuild', action='store_true',
+                              help='Force complete rebuild instead of incremental update')
     
     # Search command
     search_parser = subparsers.add_parser('search', help='Search research papers')
@@ -147,6 +154,7 @@ def cmd_build_index(args):
         index_files = [
             config.INDEX_DIR / f"faiss_index_{args.index_type}.index",
             config.INDEX_DIR / f"document_map_{args.index_type}.pkl",
+            config.INDEX_DIR / f"index_metadata_{args.index_type}.pkl",
             config.INDEX_DIR / f"embeddings_{config.EMBEDDING_MODEL.replace('/', '_')}.pkl",
             config.INDEX_DIR / f"metadata_{config.EMBEDDING_MODEL.replace('/', '_')}.pkl"
         ]
@@ -182,6 +190,102 @@ def cmd_build_index(args):
         print(f"     {key}: {value}")
     
     print("\n✅ Index building completed!")
+
+def cmd_update(args):
+    """Incrementally update index with new papers"""
+    print("🔄 Checking for new papers to add...")
+    
+    # Initialize components
+    processor = ArXivDataProcessor()
+    generator = EmbeddingGenerator()
+    vector_store = FAISSVectorStore(generator.embedding_dim, config.FAISS_INDEX_TYPE)
+    
+    # Check if index exists
+    index_exists = vector_store.index_path.exists()
+    
+    if not index_exists or args.force_rebuild:
+        if args.force_rebuild:
+            print("🔨 Force rebuild flag set, performing full rebuild...")
+        else:
+            print("📦 No existing index found, performing initial build...")
+        
+        # Full rebuild - just call build-index logic
+        class BuildArgs:
+            force = True
+            index_type = config.FAISS_INDEX_TYPE
+        
+        cmd_build_index(BuildArgs())
+        return
+    
+    # Load existing index to get current paper IDs
+    print("📂 Loading existing index...")
+    try:
+        vector_store.load_index()
+        existing_paper_ids = vector_store.get_indexed_document_ids()
+        print(f"✅ Found {len(existing_paper_ids)} papers in existing index")
+    except Exception as e:
+        print(f"❌ Error loading existing index: {e}")
+        print("💡 Try running: python main.py update --force-rebuild")
+        return
+    
+    # Process all papers from dataset
+    print("📖 Reading dataset...")
+    all_papers_df = processor.process_dataset()
+    all_paper_ids = set(all_papers_df['id'].tolist())
+    
+    print(f"📊 Total papers in dataset: {len(all_paper_ids):,}")
+    
+    # Find new papers
+    new_paper_ids = all_paper_ids - existing_paper_ids
+    
+    if not new_paper_ids:
+        print("✅ No new papers found. Index is up to date!")
+        stats = vector_store.get_stats()
+        print(f"\n📊 Current Index Statistics:")
+        print(f"     Total papers: {stats['total_papers']:,}")
+        print(f"     Last updated: {stats.get('last_updated', 'Unknown')}")
+        return
+    
+    print(f"\n🆕 Found {len(new_paper_ids):,} new papers to add!")
+    
+    # Extract new papers
+    new_papers_df = all_papers_df[all_papers_df['id'].isin(new_paper_ids)].copy()
+    
+    print(f"🧠 Generating embeddings for new papers...")
+    with Timer("Embedding generation"):
+        new_embeddings = generator.generate_embeddings_from_dataframe(
+            new_papers_df,
+            text_column='combined_text',
+            save_embeddings=False  # Don't overwrite existing embeddings
+        )
+    
+    print(f"✨ Generated embeddings for {len(new_embeddings)} papers")
+    
+    # Perform incremental update
+    print(f"📝 Updating index...")
+    new_document_ids = new_papers_df['id'].tolist()
+    
+    with Timer("Index update"):
+        update_stats = vector_store.incremental_update(
+            new_embeddings=new_embeddings,
+            new_document_ids=new_document_ids
+        )
+    
+    # Display update statistics
+    print(f"\n📊 Update Statistics:")
+    print(f"   Papers before update: {update_stats['existing_papers']:,}")
+    print(f"   New papers added: {update_stats['new_papers_added']:,}")
+    print(f"   Duplicates skipped: {update_stats['duplicates_skipped']:,}")
+    print(f"   Total papers after update: {update_stats['total_after_update']:,}")
+    
+    # Show final index stats
+    final_stats = vector_store.get_stats()
+    print(f"\n📊 Final Index Statistics:")
+    print(f"     Total vectors: {final_stats['total_vectors']:,}")
+    print(f"     Last updated: {final_stats.get('last_updated', 'Just now')}")
+    
+    print("\n✅ Incremental update completed!")
+    print("\n💡 Tip: Run 'python main.py update' anytime you add new papers to your dataset")
 
 def cmd_search(args):
     """Search research papers"""
@@ -407,6 +511,8 @@ def main():
         cmd_process(args)
     elif args.command == 'build-index':
         cmd_build_index(args)
+    elif args.command == 'update':
+        cmd_update(args)
     elif args.command == 'search':
         cmd_search(args)
     elif args.command == 'similar-papers':

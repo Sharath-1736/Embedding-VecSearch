@@ -22,7 +22,12 @@ for dir_path in [DATA_DIR, MODELS_DIR, INDEX_DIR]:
 # Dataset configuration
 ARXIV_DATASET_PATH = DATA_DIR / "arxiv-metadata-oai-snapshot.json"
 PROCESSED_DATA_PATH = DATA_DIR / "processed_papers.pkl"
-SAMPLE_SIZE = None  # CHANGED: Set to None to process ALL papers (was 1000)
+
+# Processing Options:
+# None = Process all papers (recommended for 4GB+ RAM)
+# 50000 = Process first 50,000 papers
+# 10000 = Conservative batch size for limited RAM
+SAMPLE_SIZE = None  # Set to None to process ALL papers
 
 # Embedding configuration
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # Correct
@@ -36,11 +41,15 @@ MAX_TEXT_LENGTH = 512
 
 # FAISS configuration
 FAISS_INDEX_TYPE = "IVF"  # Options: "Flat", "IVF", "HNSW"
-N_CLUSTERS = 1000  # For IVF index
-N_PROBE = 50  # Search parameter for IVF
+
+# For 50,000 papers: sqrt(50000) ≈ 224, use 256-512 clusters
+# For 100,000 papers: use 512-1000 clusters
+# For 1,000,000+ papers: use 4096-8192 clusters
+N_CLUSTERS = 256  # Optimized for ~50K papers (reduced from 1000)
+N_PROBE = 32  # Optimized for faster search (reduced from 50)
 
 # Search configuration
-TOP_K_RESULTS = 1
+TOP_K_RESULTS = 1  # Default number of search results
 SIMILARITY_THRESHOLD = 0.5
 
 # ====== AI SUMMARY CONFIGURATION ======

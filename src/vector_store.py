@@ -1,15 +1,17 @@
 """
 Vector store implementation using FAISS
 Handles efficient storage and retrieval of high-dimensional embeddings
+Enhanced with incremental update capabilities
 """
 import numpy as np
 import pandas as pd
 import faiss
 import pickle
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Set
 import logging
 import time
+from datetime import datetime
 
 import config
 
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 class FAISSVectorStore:
     """
     FAISS-based vector store for efficient similarity search
+    Enhanced with incremental update support
     """
     
     def __init__(self, embedding_dim: int, index_type: str = None):
@@ -31,11 +34,18 @@ class FAISSVectorStore:
         # Paths for saving index
         self.index_path = config.INDEX_DIR / f"faiss_index_{self.index_type}.index"
         self.document_map_path = config.INDEX_DIR / f"document_map_{self.index_type}.pkl"
+        self.metadata_path = config.INDEX_DIR / f"index_metadata_{self.index_type}.pkl"
         
         # Initialize index
         self.index = None
         self.document_map = {}
         self.is_trained = False
+        self.metadata = {
+            'created_at': None,
+            'last_updated': None,
+            'total_papers': 0,
+            'embedding_model': None
+        }
         
         logger.info(f"Initializing FAISS vector store with {self.index_type} index")
         logger.info(f"Embedding dimension: {self.embedding_dim}")
@@ -53,7 +63,7 @@ class FAISSVectorStore:
             
         elif self.index_type == "IVF":
             # Inverted file index for faster search
-            n_clusters = min(self.n_clusters, n_vectors // 10)  # Adjust clusters based on data size
+            n_clusters = min(self.n_clusters, max(10, n_vectors // 10))  # Adjust clusters based on data size
             quantizer = faiss.IndexFlatIP(self.embedding_dim)
             index = faiss.IndexIVFFlat(quantizer, self.embedding_dim, n_clusters)
             index.nprobe = self.n_probe
@@ -109,11 +119,114 @@ class FAISSVectorStore:
         
         self.document_map = {i: doc_id for i, doc_id in enumerate(document_ids)}
         
+        # Update metadata
+        self.metadata['created_at'] = datetime.now().isoformat()
+        self.metadata['last_updated'] = datetime.now().isoformat()
+        self.metadata['total_papers'] = len(embeddings)
+        
         logger.info(f"Index built successfully. Total vectors: {self.index.ntotal}")
+    
+    def get_indexed_document_ids(self) -> Set[str]:
+        """
+        Get set of all document IDs currently in the index
+        """
+        if not self.document_map_path.exists():
+            return set()
+        
+        try:
+            with open(self.document_map_path, 'rb') as f:
+                doc_map = pickle.load(f)
+            return set(doc_map.values())
+        except Exception as e:
+            logger.warning(f"Could not load document map: {e}")
+            return set()
+    
+    def incremental_update(self, new_embeddings: np.ndarray, new_document_ids: List[str],
+                          existing_embeddings: np.ndarray = None, 
+                          existing_document_ids: List[str] = None) -> Dict:
+        """
+        Incrementally update index with new papers
+        
+        Returns:
+            Dict with update statistics
+        """
+        logger.info(f"Performing incremental update with {len(new_embeddings)} new papers...")
+        
+        update_stats = {
+            'new_papers_added': 0,
+            'existing_papers': 0,
+            'duplicates_skipped': 0,
+            'total_after_update': 0
+        }
+        
+        # Load existing index if available
+        index_exists = self.index_path.exists() and self.document_map_path.exists()
+        
+        if index_exists:
+            logger.info("Loading existing index...")
+            self.load_index()
+            
+            # Get existing document IDs
+            existing_ids = set(self.document_map.values())
+            update_stats['existing_papers'] = len(existing_ids)
+            
+            # Filter out duplicates
+            new_ids_set = set(new_document_ids)
+            duplicates = existing_ids.intersection(new_ids_set)
+            
+            if duplicates:
+                logger.info(f"Skipping {len(duplicates)} duplicate papers")
+                update_stats['duplicates_skipped'] = len(duplicates)
+                
+                # Filter out duplicates
+                mask = [doc_id not in existing_ids for doc_id in new_document_ids]
+                new_embeddings = new_embeddings[mask]
+                new_document_ids = [doc_id for doc_id, keep in zip(new_document_ids, mask) if keep]
+            
+            if len(new_embeddings) == 0:
+                logger.info("No new papers to add after filtering duplicates")
+                update_stats['total_after_update'] = self.index.ntotal
+                return update_stats
+            
+            # Add new vectors to existing index
+            logger.info(f"Adding {len(new_embeddings)} new vectors to existing index...")
+            self.add_vectors(new_embeddings, new_document_ids)
+            update_stats['new_papers_added'] = len(new_embeddings)
+            
+        else:
+            # No existing index, build from scratch
+            logger.info("No existing index found, building new index...")
+            
+            # Combine existing and new if provided
+            if existing_embeddings is not None and existing_document_ids is not None:
+                all_embeddings = np.vstack([existing_embeddings, new_embeddings])
+                all_document_ids = existing_document_ids + new_document_ids
+                logger.info(f"Building index with {len(existing_embeddings)} existing + {len(new_embeddings)} new papers")
+            else:
+                all_embeddings = new_embeddings
+                all_document_ids = new_document_ids
+                logger.info(f"Building index with {len(new_embeddings)} papers")
+            
+            self.build_index(all_embeddings, all_document_ids)
+            update_stats['new_papers_added'] = len(new_embeddings)
+            if existing_embeddings is not None:
+                update_stats['existing_papers'] = len(existing_embeddings)
+        
+        # Update metadata
+        self.metadata['last_updated'] = datetime.now().isoformat()
+        self.metadata['total_papers'] = self.index.ntotal
+        
+        # Save updated index
+        self.save_index()
+        
+        update_stats['total_after_update'] = self.index.ntotal
+        
+        logger.info(f"Incremental update complete: {update_stats}")
+        return update_stats
     
     def save_index(self):
         """
-        Save FAISS index and document mapping to disk
+        Save FAISS index, document mapping, and metadata to disk
         """
         if self.index is None:
             raise ValueError("No index to save. Build index first.")
@@ -124,10 +237,14 @@ class FAISSVectorStore:
         logger.info(f"Saving document mapping to {self.document_map_path}")
         with open(self.document_map_path, 'wb') as f:
             pickle.dump(self.document_map, f)
+        
+        logger.info(f"Saving metadata to {self.metadata_path}")
+        with open(self.metadata_path, 'wb') as f:
+            pickle.dump(self.metadata, f)
     
     def load_index(self):
         """
-        Load FAISS index and document mapping from disk
+        Load FAISS index, document mapping, and metadata from disk
         """
         if not self.index_path.exists():
             raise FileNotFoundError(f"Index file not found: {self.index_path}")
@@ -141,6 +258,11 @@ class FAISSVectorStore:
         logger.info(f"Loading document mapping from {self.document_map_path}")
         with open(self.document_map_path, 'rb') as f:
             self.document_map = pickle.load(f)
+        
+        # Load metadata if exists
+        if self.metadata_path.exists():
+            with open(self.metadata_path, 'rb') as f:
+                self.metadata = pickle.load(f)
         
         # Set search parameters for IVF index
         if hasattr(self.index, 'nprobe'):
@@ -225,7 +347,7 @@ class FAISSVectorStore:
     
     def get_stats(self) -> Dict:
         """
-        Get index statistics
+        Get index statistics including metadata
         """
         if self.index is None:
             return {"status": "No index loaded"}
@@ -235,6 +357,9 @@ class FAISSVectorStore:
             "embedding_dimension": self.embedding_dim,
             "total_vectors": self.index.ntotal,
             "is_trained": self.is_trained,
+            "created_at": self.metadata.get('created_at'),
+            "last_updated": self.metadata.get('last_updated'),
+            "total_papers": self.metadata.get('total_papers', self.index.ntotal)
         }
         
         if hasattr(self.index, 'nprobe'):

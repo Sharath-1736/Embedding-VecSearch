@@ -48,5 +48,10 @@
     "summary": "Effective human-robot interaction requires robots to understand and respond to multiple communication modalities simultaneously.",
     "timestamp": "2025-09-14T17:00:38.282325",
     "title": "Multimodal Learning for Human-Robot Interaction: Integrating Vision, Speech, and Gesture"
+  },
+  "91043e15779e7d26af7fd014bdfbfb72": {
+    "summary": "Redundancy of experimental data is the basic statistic from which the complexity of a natural phenomenon and the proper number of experiments needed for its exploration can be estimated.",
+    "timestamp": "2025-10-25T13:59:44.421222",
+    "title": "Estimation of experimental data redundancy and related statistics"
   }
 }

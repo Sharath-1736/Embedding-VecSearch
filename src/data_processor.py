@@ -1,7 +1,6 @@
 """
 Data processing module for ArXiv dataset
-Handles loading, cleaning, and preprocessing of research papers
-Updated to handle JSON array format (not JSONL)
+Enhanced with smart cache detection for incremental updates
 """
 import json
 import pandas as pd
@@ -13,6 +12,7 @@ from typing import Dict, List, Optional, Iterator
 from datetime import datetime
 import logging
 from tqdm import tqdm
+import hashlib
 
 import nltk
 from nltk.corpus import stopwords
@@ -38,12 +38,13 @@ logger = logging.getLogger(__name__)
 class ArXivDataProcessor:
     """
     Processes ArXiv dataset for vector search
-    Updated to handle JSON array format from Kaggle
+    Enhanced with smart caching for incremental updates
     """
     
     def __init__(self):
         self.data_path = config.ARXIV_DATASET_PATH
         self.processed_path = config.PROCESSED_DATA_PATH
+        self.cache_metadata_path = config.DATA_DIR / "cache_metadata.pkl"
         self.sample_size = config.SAMPLE_SIZE
         self.included_categories = config.INCLUDED_CATEGORIES
         
@@ -64,6 +65,97 @@ class ArXivDataProcessor:
             nltk.data.find('corpora/stopwords')
         except LookupError:
             nltk.download('stopwords')
+    
+    def _get_file_hash(self) -> str:
+        """
+        Get a hash of the dataset file to detect changes
+        Uses first 1MB and last 1MB to be fast for large files
+        """
+        if not self.data_path.exists():
+            return ""
+        
+        try:
+            hasher = hashlib.md5()
+            file_size = self.data_path.stat().st_size
+            
+            with open(self.data_path, 'rb') as f:
+                # Hash first 1MB
+                chunk = f.read(min(1024 * 1024, file_size))
+                hasher.update(chunk)
+                
+                # Hash last 1MB if file is large enough
+                if file_size > 2 * 1024 * 1024:
+                    f.seek(-1024 * 1024, 2)  # Seek from end
+                    chunk = f.read(1024 * 1024)
+                    hasher.update(chunk)
+                
+                # Also include file size in hash
+                hasher.update(str(file_size).encode())
+            
+            return hasher.hexdigest()
+        except Exception as e:
+            logger.warning(f"Could not compute file hash: {e}")
+            return ""
+    
+    def _should_reprocess(self) -> bool:
+        """
+        Determine if we should reprocess the dataset
+        Returns True if dataset file has changed
+        """
+        if not self.processed_path.exists():
+            logger.info("No processed data found, will process dataset")
+            return True
+        
+        if not self.cache_metadata_path.exists():
+            logger.info("No cache metadata found, will reprocess dataset")
+            return True
+        
+        try:
+            # Load cache metadata
+            with open(self.cache_metadata_path, 'rb') as f:
+                cache_metadata = pickle.load(f)
+            
+            # Get current file hash
+            current_hash = self._get_file_hash()
+            cached_hash = cache_metadata.get('file_hash', '')
+            
+            if current_hash != cached_hash:
+                logger.info("Dataset file has changed, will reprocess")
+                return True
+            
+            # Check if config has changed
+            if cache_metadata.get('sample_size') != config.SAMPLE_SIZE:
+                logger.info("SAMPLE_SIZE config changed, will reprocess")
+                return True
+            
+            if cache_metadata.get('included_categories') != config.INCLUDED_CATEGORIES:
+                logger.info("INCLUDED_CATEGORIES config changed, will reprocess")
+                return True
+            
+            logger.info("Cache is valid, loading existing processed data")
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Error checking cache validity: {e}")
+            return True
+    
+    def _save_cache_metadata(self):
+        """Save metadata about the current cache"""
+        try:
+            metadata = {
+                'file_hash': self._get_file_hash(),
+                'sample_size': config.SAMPLE_SIZE,
+                'included_categories': config.INCLUDED_CATEGORIES,
+                'processed_date': datetime.now().isoformat(),
+                'file_path': str(self.data_path)
+            }
+            
+            with open(self.cache_metadata_path, 'wb') as f:
+                pickle.dump(metadata, f)
+            
+            logger.info("Saved cache metadata")
+        except Exception as e:
+            logger.warning(f"Could not save cache metadata: {e}")
     
     def load_raw_data(self) -> Iterator[Dict]:
         """
@@ -226,7 +318,7 @@ class ArXivDataProcessor:
             # Sample first 200 characters for detection
             sample = text[:200]
             return detect(sample) == 'en'
-        except (LangDetectError, Exception):
+        except (LangDetectException, Exception):
             return True  # Assume English if detection fails
     
     def should_include_paper(self, paper: Dict) -> bool:
@@ -314,21 +406,22 @@ class ArXivDataProcessor:
         return processed_paper
     
     def process_dataset(self, save_processed: bool = True) -> pd.DataFrame:
-        """Process entire dataset"""
+        """Process entire dataset with smart caching"""
         logger.info("Starting dataset processing...")
         
-        # Check if processed data already exists
-        if self.processed_path.exists():
-            logger.info(f"Loading existing processed data from {self.processed_path}")
+        # Check if we can use cached data
+        if not self._should_reprocess():
+            logger.info(f"Loading cached processed data from {self.processed_path}")
             try:
                 with open(self.processed_path, 'rb') as f:
                     df = pickle.load(f)
-                logger.info(f"Loaded {len(df)} processed papers")
+                logger.info(f"Loaded {len(df)} processed papers from cache")
                 return df
             except Exception as e:
-                logger.warning(f"Failed to load existing processed data: {e}")
-                logger.info("Reprocessing dataset...")
+                logger.warning(f"Failed to load cached data: {e}")
+                logger.info("Will reprocess dataset...")
         
+        # Process dataset
         processed_papers = []
         total_papers = 0
         skipped_papers = 0
@@ -371,13 +464,16 @@ class ArXivDataProcessor:
         # Convert to DataFrame
         df = pd.DataFrame(processed_papers)
         
-        # Save processed data
+        # Save processed data and metadata
         if save_processed and len(df) > 0:
             logger.info(f"Saving processed data to {self.processed_path}")
             try:
                 with open(self.processed_path, 'wb') as f:
                     pickle.dump(df, f)
                 logger.info("Successfully saved processed data")
+                
+                # Save cache metadata
+                self._save_cache_metadata()
                 
                 # Remove temporary file if it exists
                 temp_path = self.processed_path.with_suffix('.temp.pkl')
