@@ -53,5 +53,40 @@
     "summary": "Redundancy of experimental data is the basic statistic from which the complexity of a natural phenomenon and the proper number of experiments needed for its exploration can be estimated.",
     "timestamp": "2025-10-25T13:59:44.421222",
     "title": "Estimation of experimental data redundancy and related statistics"
+  },
+  "b5570a73106937e1d1c545f5a7332c2f": {
+    "summary": "We improve the upper bound on the minimal resources required for measurement-based quantum computation.",
+    "timestamp": "2025-11-03T07:22:16.971242",
+    "title": "Towards Minimal Resources of Measurement-based Quantum Computation"
+  },
+  "d70337560f06342665526965cf22045a": {
+    "summary": "Some multipartite quantum states can be generated in a sequential manner which may be implemented by various physical setups like microwave and optical cavity QED, trapped ions, and quantum dots etc.",
+    "timestamp": "2025-11-03T07:22:17.332513",
+    "title": "General sequential quantum cloning"
+  },
+  "c0e2ca5160b80493da74a9367b42bd5b": {
+    "summary": "We consider an atom-field coupled system, in which two pairs of four-level atoms are respectively driven by laser fields and trapped in two distant cavities that are connected by an optical fiber.",
+    "timestamp": "2025-11-03T11:33:56.978517",
+    "title": "Implementation of holonomic quantum computation through engineering and manipulating environment"
+  },
+  "ad793f8c1e41ab8ade4eedf3b9e14a1e": {
+    "summary": "We present a computer-aided design flow for quantum circuits, complete with automatic layout and control logic extraction.",
+    "timestamp": "2025-11-03T11:33:57.926073",
+    "title": "Automated Generation of Layout and Control for Quantum Circuits"
+  },
+  "ad5ae4018d49c023b17887796fa79901": {
+    "summary": "Lasers and LEDs display a statistical distribution in the number of photons emitted in a given time interval.",
+    "timestamp": "2025-11-03T11:33:59.353868",
+    "title": "Review: Semiconductor Quantum Light Sources"
+  },
+  "1f60259119ee4ebfe68ddf2a71b5fba6": {
+    "summary": "Structure entails function and thus a structural description of the brain will help to understand its function and may provide insights into many prop...",
+    "timestamp": "2025-11-03T11:35:44.799511",
+    "title": "Simulation of Robustness against Lesions of Cortical Networks"
+  },
+  "366e0b11e13ef4a3e0c521b98e91f4b3": {
+    "summary": "We present an analysis of the percolation transition for general node removal strategies valid for locally tree-like directed networks.",
+    "timestamp": "2025-11-03T11:35:58.123028",
+    "title": "Weighted percolation on directed networks"
   }
 }

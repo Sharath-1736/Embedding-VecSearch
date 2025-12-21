@@ -1,6 +1,6 @@
 """
 Streamlit web application for ArXiv Vector Search System
-Enhanced with PDF download functionality and Individual AI Summaries
+Fixed Similarity Scores & Enhanced Search Features
 """
 import streamlit as st
 import pandas as pd
@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 import json
 import sys
 import os
-import tempfile
 import zipfile
 from pathlib import Path
 
@@ -27,11 +26,321 @@ import config
 
 # Page configuration
 st.set_page_config(
-    page_title=config.APP_TITLE,
+    page_title="Re-Search AI",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Enhanced CSS with modern search page design
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap');
+    
+    * {
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    /* Remove empty boxes */
+    .element-container:has(> .stMarkdown:empty) {
+        display: none !important;
+    }
+    
+    div[data-testid="stVerticalBlock"]:empty {
+        display: none !important;
+    }
+    
+    /* Elegant gradient background */
+    .main {
+        background: linear-gradient(135deg, #FFF8DC 0%, #f5e6ff 50%, #e8d4f5 100%);
+        background-attachment: fixed;
+    }
+    
+    /* Remove automatic box styling */
+    div[data-testid="stVerticalBlock"] > div {
+        background: transparent !important;
+        backdrop-filter: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    /* Modern search container */
+    .search-container {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        border-radius: 25px;
+        padding: 40px;
+        box-shadow: 0 15px 50px rgba(201, 160, 220, 0.3);
+        border: 3px solid rgba(201, 160, 220, 0.4);
+        margin-bottom: 30px;
+        transition: all 0.4s ease;
+    }
+    
+    .search-container:hover {
+        box-shadow: 0 20px 60px rgba(201, 160, 220, 0.5);
+        transform: translateY(-3px);
+    }
+    
+    /* Headers */
+    h1, h2, h3 {
+        color: #8b5fa8;
+        font-weight: 900;
+    }
+    
+    h1 {
+        background: linear-gradient(135deg, #c9a0dc 0%, #8b5fa8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    /* Modern buttons with glow */
+    .stButton>button {
+        background: linear-gradient(135deg, #c9a0dc 0%, #b88dd4 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 15px !important;
+        padding: 14px 35px !important;
+        font-weight: 700 !important;
+        letter-spacing: 1px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 8px 25px rgba(201, 160, 220, 0.5) !important;
+        text-transform: uppercase !important;
+        font-size: 14px !important;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-4px) scale(1.05) !important;
+        box-shadow: 0 15px 40px rgba(201, 160, 220, 0.7) !important;
+        background: linear-gradient(135deg, #d4b0e8 0%, #c9a0dc 100%) !important;
+    }
+    
+    .stButton>button:active {
+        transform: translateY(-2px) scale(1.02) !important;
+    }
+    
+    /* Download button with special styling */
+    .stDownloadButton>button {
+        background: linear-gradient(135deg, #FFF8DC 0%, #c9a0dc 100%) !important;
+        color: #8b5fa8 !important;
+        border: 2px solid #c9a0dc !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 6px 20px rgba(201, 160, 220, 0.4) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stDownloadButton>button:hover {
+        transform: scale(1.08) !important;
+        box-shadow: 0 12px 35px rgba(201, 160, 220, 0.6) !important;
+        background: linear-gradient(135deg, #c9a0dc 0%, #FFF8DC 100%) !important;
+        color: white !important;
+    }
+    
+    /* Modern input with glow effect */
+    .stTextInput>div>div>input {
+        background: white !important;
+        border: 3px solid rgba(201, 160, 220, 0.4) !important;
+        border-radius: 20px !important;
+        color: #6b4c7a !important;
+        padding: 18px 25px !important;
+        font-size: 17px !important;
+        transition: all 0.3s ease !important;
+        font-weight: 500 !important;
+        box-shadow: 0 5px 15px rgba(201, 160, 220, 0.2) !important;
+    }
+    
+    .stTextInput>div>div>input:focus {
+        border: 3px solid #c9a0dc !important;
+        box-shadow: 0 0 30px rgba(201, 160, 220, 0.5), 0 8px 25px rgba(201, 160, 220, 0.3) !important;
+        transform: scale(1.02) !important;
+    }
+    
+    .stTextInput>div>div>input::placeholder {
+        color: rgba(139, 95, 168, 0.5) !important;
+        font-style: italic !important;
+    }
+    
+    /* Similarity score badge */
+    .similarity-high {
+        background: linear-gradient(135deg, #90c695 0%, #72b377 100%);
+        color: white;
+        padding: 8px 18px;
+        border-radius: 25px;
+        font-weight: 800;
+        font-size: 15px;
+        box-shadow: 0 4px 15px rgba(144, 198, 149, 0.4);
+        display: inline-block;
+    }
+    
+    .similarity-medium {
+        background: linear-gradient(135deg, #c9a0dc 0%, #b88dd4 100%);
+        color: white;
+        padding: 8px 18px;
+        border-radius: 25px;
+        font-weight: 800;
+        font-size: 15px;
+        box-shadow: 0 4px 15px rgba(201, 160, 220, 0.4);
+        display: inline-block;
+    }
+    
+    .similarity-low {
+        background: linear-gradient(135deg, #89b4d4 0%, #6a9dc4 100%);
+        color: white;
+        padding: 8px 18px;
+        border-radius: 25px;
+        font-weight: 800;
+        font-size: 15px;
+        box-shadow: 0 4px 15px rgba(137, 180, 212, 0.4);
+        display: inline-block;
+    }
+    
+    /* Metric cards */
+    div[data-testid="stMetricValue"] {
+        font-size: 36px !important;
+        font-weight: 900 !important;
+        color: #8b5fa8 !important;
+    }
+    
+    div[data-testid="stMetricLabel"] {
+        color: #6b4c7a !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1.5px !important;
+    }
+    
+    /* Dividers with gradient */
+    hr {
+        border: none !important;
+        height: 3px !important;
+        background: linear-gradient(90deg, transparent, #c9a0dc, transparent) !important;
+        margin: 35px 0 !important;
+        box-shadow: 0 0 10px rgba(201, 160, 220, 0.5) !important;
+    }
+    
+    /* Modern expander */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(201, 160, 220, 0.15) 100%) !important;
+        border-radius: 15px !important;
+        border: 2px solid rgba(201, 160, 220, 0.5) !important;
+        color: #6b4c7a !important;
+        font-weight: 700 !important;
+        transition: all 0.3s ease !important;
+        padding: 18px !important;
+        box-shadow: 0 5px 15px rgba(201, 160, 220, 0.2) !important;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: linear-gradient(135deg, rgba(201, 160, 220, 0.25) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
+        box-shadow: 0 8px 25px rgba(201, 160, 220, 0.4) !important;
+        transform: scale(1.03) !important;
+        border-color: #c9a0dc !important;
+    }
+    
+    /* Alert boxes with modern design */
+    .stSuccess, .stError, .stWarning, .stInfo {
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 15px !important;
+        border-left: 5px solid !important;
+        padding: 20px !important;
+        font-weight: 500 !important;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    .stSuccess { border-left-color: #90c695 !important; color: #4a7c4e !important; }
+    .stError { border-left-color: #e88b8b !important; color: #a64444 !important; }
+    .stWarning { border-left-color: #f4c542 !important; color: #997a2a !important; }
+    .stInfo { border-left-color: #89b4d4 !important; color: #4a6d8c !important; }
+    
+    /* Sidebar styling (unchanged) */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, rgba(201, 160, 220, 0.95) 0%, rgba(255, 248, 220, 0.95) 100%) !important;
+    }
+    
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label {
+        color: #6b4c7a !important;
+    }
+    
+    /* Modern tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 15px !important;
+        background: rgba(255, 255, 255, 0.7) !important;
+        padding: 15px !important;
+        border-radius: 20px !important;
+        box-shadow: 0 5px 15px rgba(201, 160, 220, 0.2) !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255, 248, 220, 0.8) !important;
+        border-radius: 15px !important;
+        color: #6b4c7a !important;
+        font-weight: 700 !important;
+        padding: 15px 35px !important;
+        transition: all 0.3s ease !important;
+        border: 2px solid transparent !important;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background: rgba(201, 160, 220, 0.3) !important;
+        transform: translateY(-2px) !important;
+        border: 2px solid rgba(201, 160, 220, 0.5) !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #c9a0dc 0%, #b88dd4 100%) !important;
+        color: white !important;
+        box-shadow: 0 8px 25px rgba(201, 160, 220, 0.5) !important;
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    /* Result number badge with animation */
+    .result-badge {
+        background: linear-gradient(135deg, #c9a0dc, #8b5fa8);
+        color: white;
+        border-radius: 50%;
+        width: 55px;
+        height: 55px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 900;
+        box-shadow: 0 8px 25px rgba(201, 160, 220, 0.5);
+        transition: all 0.4s ease;
+    }
+    
+    .result-badge:hover {
+        transform: rotate(360deg) scale(1.15);
+        box-shadow: 0 12px 35px rgba(201, 160, 220, 0.7);
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 12px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(255, 248, 220, 0.3);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #c9a0dc 0%, #d4b0e8 100%);
+        border-radius: 10px;
+        border: 2px solid rgba(255, 248, 220, 0.5);
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #b88dd4 0%, #c9a0dc 100%);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 @st.cache_data
 def load_data():
@@ -51,61 +360,53 @@ def initialize_search_engine():
         if error:
             return None, error
         
-        search_engine = ArXivSearchEngine(df)
+        # Initialize with enhanced features
+        search_engine = ArXivSearchEngine(
+            df,
+            use_reranker=True,  # Enable re-ranking
+            use_hybrid=True     # Enable hybrid embeddings
+        )
         return search_engine, None
     except Exception as e:
         return None, str(e)
 
 def download_single_pdf_streamlit(arxiv_id: str, title: str = None) -> dict:
-    """Download a single PDF for Streamlit download button"""
-    if not validate_arxiv_id(arxiv_id):
-        return {'success': False, 'error': 'Invalid ArXiv ID'}
-    
-    pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
-    
+    """Download a single PDF"""
     try:
+        if not validate_arxiv_id(arxiv_id):
+            return {'success': False, 'error': 'Invalid ArXiv ID'}
+        
         import requests
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
+        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+        headers = {'User-Agent': 'Mozilla/5.0'}
         
         response = requests.get(pdf_url, headers=headers, stream=True, timeout=30)
         response.raise_for_status()
         
         pdf_data = response.content
         
-        if len(pdf_data) > 0:
-            # Create a clean filename
-            if title:
-                clean_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
-                clean_title = clean_title[:50]  # Limit length
-                filename = f"{arxiv_id}_{clean_title}.pdf"
-            else:
-                filename = f"{arxiv_id}.pdf"
-            
-            return {
-                'success': True,
-                'data': pdf_data,
-                'filename': filename,
-                'size': len(pdf_data)
-            }
+        if not pdf_data or not pdf_data.startswith(b'%PDF'):
+            return {'success': False, 'error': 'Invalid PDF'}
+        
+        if title:
+            clean_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()[:50]
+            filename = f"{arxiv_id}_{clean_title}.pdf"
         else:
-            return {'success': False, 'error': 'Downloaded file is empty'}
-            
-    except Exception as e:
-        return {'success': False, 'error': f'Download failed: {str(e)}'}
+            filename = f"{arxiv_id}.pdf"
+        
+        return {'success': True, 'data': pdf_data, 'filename': filename, 'size': len(pdf_data)}
+    except:
+        return {'success': False, 'error': 'Download failed'}
 
 def create_zip_download_streamlit(selected_results: list) -> dict:
-    """Create ZIP file with selected PDFs for Streamlit"""
+    """Create ZIP file with selected PDFs"""
     if not selected_results:
         return {'success': False, 'error': 'No papers selected'}
     
-    # Create a temporary ZIP file in memory
     import io
     zip_buffer = io.BytesIO()
-    
-    successful_downloads = []
-    failed_downloads = []
+    successful = []
+    failed = []
     
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -115,287 +416,271 @@ def create_zip_download_streamlit(selected_results: list) -> dict:
             arxiv_id = result.get('arxiv_id') or extract_arxiv_id(result.get('document_id', ''))
             
             if not arxiv_id:
-                failed_downloads.append({
-                    'title': result.get('title', 'Unknown'),
-                    'error': 'No ArXiv ID available'
-                })
+                failed.append({'title': result.get('title', 'Unknown'), 'error': 'No ID'})
                 continue
             
-            status_text.text(f"Downloading {arxiv_id}... ({i+1}/{len(selected_results)})")
+            status_text.text(f"📥 {arxiv_id}... ({i+1}/{len(selected_results)})")
             
             download_result = download_single_pdf_streamlit(arxiv_id, result.get('title'))
             
-            if download_result['success']:
-                # Add to ZIP
+            if download_result and download_result.get('success'):
                 zip_file.writestr(download_result['filename'], download_result['data'])
-                successful_downloads.append({
-                    'arxiv_id': arxiv_id,
-                    'title': result.get('title', 'Unknown'),
-                    'size_mb': download_result['size'] / (1024 * 1024)
-                })
+                successful.append({'arxiv_id': arxiv_id, 'title': result.get('title')})
             else:
-                failed_downloads.append({
-                    'title': result.get('title', 'Unknown'),
-                    'arxiv_id': arxiv_id,
-                    'error': download_result['error']
-                })
+                failed.append({'title': result.get('title'), 'error': 'Failed'})
             
             progress_bar.progress((i + 1) / len(selected_results))
     
     status_text.empty()
     progress_bar.empty()
     
-    if successful_downloads:
+    if successful:
         zip_buffer.seek(0)
-        total_size = sum(d['size_mb'] for d in successful_downloads)
-        
         return {
             'success': True,
             'data': zip_buffer.getvalue(),
-            'filename': f'arxiv_papers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip',
-            'successful': successful_downloads,
-            'failed': failed_downloads,
-            'total_size_mb': total_size
+            'filename': f'papers_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip',
+            'successful': successful,
+            'failed': failed
         }
-    else:
-        return {
-            'success': False,
-            'error': 'No PDFs could be downloaded',
-            'failed': failed_downloads
-        }
+    return {'success': False, 'error': 'No PDFs downloaded'}
 
-def display_search_result(result: dict, index: int, show_download: bool = True):
-    """Display a single search result with AI summary, abstract, and download options"""
+def display_search_result(result: dict, index: int):
+    """Display a single search result with fixed similarity score (0-1 range)"""
+    
     with st.container():
-        # Main result container
-        col1, col2, col3 = st.columns([0.1, 0.7, 0.2])
+        st.markdown(f"""
+        <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(15px);
+                    border-radius: 20px; border: 2px solid rgba(201, 160, 220, 0.3);
+                    padding: 30px; margin-bottom: 25px; box-shadow: 0 10px 35px rgba(201, 160, 220, 0.2);
+                    transition: all 0.3s ease;">
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([0.05, 0.75, 0.2])
         
         with col1:
-            st.markdown(f"**{index + 1}**")
+            st.markdown(f'<div class="result-badge">{index + 1}</div>', unsafe_allow_html=True)
         
         with col2:
-            # Extract ArXiv ID
             arxiv_id = result.get('arxiv_id') or extract_arxiv_id(result.get('document_id', ''))
             
-            # Title with link
             if arxiv_id:
-                st.markdown(f"**[{result['title']}](https://arxiv.org/abs/{arxiv_id})**")
+                st.markdown(f"### [{result['title']}](https://arxiv.org/abs/{arxiv_id})")
             else:
-                st.markdown(f"**{result['title']}**")
+                st.markdown(f"### {result['title']}")
             
-            # Metadata row
-            col_meta1, col_meta2, col_meta3 = st.columns([0.3, 0.4, 0.3])
+            # Fixed similarity score (ensure it's between 0 and 1)
+            score = float(result.get('similarity_score', 0))
+            # Normalize if score is outside 0-1 range
+            if score > 1.0:
+                score = min(score / 10.0, 1.0)  # Normalize scores that are too high
+            score = max(0.0, min(1.0, score))  # Clamp between 0 and 1
+            
+            # Determine badge style based on score
+            if score > 0.7:
+                badge_class = "similarity-high"
+                emoji = "🔥"
+                label = "High Match"
+            elif score > 0.5:
+                badge_class = "similarity-medium"
+                emoji = "⭐"
+                label = "Good Match"
+            else:
+                badge_class = "similarity-low"
+                emoji = "💫"
+                label = "Fair Match"
+            
+            categories_str = format_categories(result['categories'], 2)
+            
+            col_meta1, col_meta2 = st.columns(2)
             
             with col_meta1:
-                st.markdown(f"**Similarity:** {result['similarity_score']:.3f}")
+                st.markdown(f'<div class="{badge_class}">{emoji} {score:.3f} - {label}</div>', unsafe_allow_html=True)
             
             with col_meta2:
-                st.markdown(f"**Categories:** {format_categories(result['categories'], 2)}")
+                st.markdown(f"**🏷️ Categories:** {categories_str}")
             
-            with col_meta3:
-                if result.get('update_date'):
-                    try:
-                        date_str = pd.to_datetime(result['update_date']).strftime('%Y-%m-%d')
-                        st.markdown(f"**Date:** {date_str}")
-                    except:
-                        st.markdown("**Date:** Unknown")
+            st.markdown("<br>", unsafe_allow_html=True)
             
-            # Authors
             if result.get('authors'):
-                st.markdown(f"**Authors:** {format_authors(result['authors'], 3)}")
+                st.markdown(f"**👥 Authors:** {format_authors(result['authors'], 3)}")
             
-            # AI Summary Section (New Feature)
+            # AI Summary or Abstract
             if result.get('ai_summary'):
-                st.markdown("### 🤖 AI Summary")
-                st.info(result['ai_summary'])
-                
-                # Show abstract in expandable section when AI summary is available
-                if result.get('abstract'):
-                    with st.expander("📄 View Full Abstract", expanded=False):
-                        st.markdown(result['abstract'])
-            
+                with st.expander("🤖 AI Summary", expanded=True):
+                    st.info(result['ai_summary'])
+                with st.expander("📄 Full Abstract"):
+                    st.write(result.get('abstract', 'No abstract'))
             else:
-                # Show abstract directly if no AI summary
-                abstract = result.get('abstract', 'No abstract available')
-                if len(abstract) > 300:
-                    with st.expander("📄 Abstract", expanded=False):
-                        st.markdown(abstract)
-                else:
-                    st.markdown(f"**Abstract:** {abstract}")
+                with st.expander("📄 Abstract"):
+                    st.write(result.get('abstract', 'No abstract'))
         
         with col3:
-            # Download and link section
-            if show_download and arxiv_id:
-                # PDF availability indicator
-                if result.get('pdf_available'):
-                    st.success("✅ PDF Available")
-                else:
-                    st.warning("⚠️ PDF Status Unknown")
+            if arxiv_id:
+                # Find Similar Papers button
+                if st.button("🔗 Similar", key=f"sim_{index}", use_container_width=True, help="Find papers similar to this one"):
+                    st.session_state.similar_paper_id = arxiv_id
+                    st.session_state.show_similar = True
+                    st.rerun()
                 
-                # PDF download button
-                if st.button(f"📥 Download PDF", key=f"download_{index}", help=f"Download {arxiv_id}.pdf"):
-                    with st.spinner(f"Downloading {arxiv_id}.pdf..."):
-                        download_result = download_single_pdf_streamlit(arxiv_id, result.get('title'))
+                if st.button("📥 PDF", key=f"dl_{index}", use_container_width=True):
+                    with st.spinner("⏳"):
+                        dl_result = download_single_pdf_streamlit(arxiv_id, result.get('title'))
                         
-                        if download_result['success']:
+                        if dl_result and dl_result.get('success'):
                             st.download_button(
-                                label=f"💾 Save PDF ({format_file_size(download_result['size'])})",
-                                data=download_result['data'],
-                                file_name=download_result['filename'],
-                                mime="application/pdf",
-                                key=f"save_{index}",
-                                help=f"Click to save {download_result['filename']}"
+                                "💾 Save",
+                                dl_result['data'],
+                                dl_result['filename'],
+                                "application/pdf",
+                                key=f"sv_{index}",
+                                use_container_width=True
                             )
-                            st.success("Ready to download!")
+                            st.success("✅")
                         else:
-                            st.error(f"❌ {download_result['error']}")
+                            st.error("❌")
                 
-                # ArXiv link
-                st.link_button("🔗 View on ArXiv", f"https://arxiv.org/abs/{arxiv_id}", help="Open paper on ArXiv", use_container_width=True)
-            
-            elif not arxiv_id:
-                st.warning("No ArXiv ID available")
+                st.link_button("🌐 ArXiv", f"https://arxiv.org/abs/{arxiv_id}", use_container_width=True)
         
-        st.divider()
+        st.markdown("</div>", unsafe_allow_html=True)
 
-def display_ai_summary_stats():
-    """Display AI summary configuration and cost information"""
-    if config.ENABLE_INDIVIDUAL_SUMMARIES:
-        st.sidebar.markdown("### 🤖 AI Summary Settings")
-        st.sidebar.success("✅ Individual summaries enabled")
-        
-        # Show configuration
-        st.sidebar.markdown(f"**Model:** {config.OPENAI_MODEL}")
-        st.sidebar.markdown(f"**Max summaries:** {config.MAX_SUMMARIES_PER_SEARCH}")
-        st.sidebar.markdown(f"**Max tokens:** {config.INDIVIDUAL_SUMMARY_MAX_TOKENS}")
-        
-        # Estimate cost
-        estimated_cost = config.estimate_cost_per_search()
-        st.sidebar.markdown(f"**Est. cost per search:** ~${estimated_cost:.4f}")
-        
-        if config.ENABLE_SUMMARY_CACHING:
-            st.sidebar.markdown("💾 Caching enabled")
-    else:
-        st.sidebar.markdown("### 🤖 AI Summary Settings")
-        st.sidebar.warning("❌ Individual summaries disabled")
-
-def display_statistics_sidebar(df: pd.DataFrame):
-    """Display dataset statistics in sidebar"""
-    st.sidebar.markdown("### 📊 Dataset Statistics")
+def display_sidebar_stats(df: pd.DataFrame):
+    """Display sidebar statistics (unchanged)"""
     
-    total_papers = len(df)
-    st.sidebar.metric("Total Papers", f"{total_papers:,}")
+    st.sidebar.markdown("""
+    <div style="text-align: center; padding: 25px 10px; background: rgba(255, 248, 220, 0.7);
+                border-radius: 20px; margin-bottom: 20px; border: 2px solid rgba(201, 160, 220, 0.5);">
+        <div style="font-size: 48px;">🔍</div>
+        <h2 style="font-size: 24px; margin: 10px 0 5px 0;">PaperPilot</h2>
+        <p style="font-size: 12px; margin: 0;">Semantic Search</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Date range
-    if 'update_date' in df.columns and df['update_date'].notna().any():
-        min_date = df['update_date'].min()
-        max_date = df['update_date'].max()
-        st.sidebar.markdown(f"**Date Range:** {min_date.strftime('%Y-%m-%d')} to {max_date.strftime('%Y-%m-%d')}")
+    st.sidebar.markdown("### 📊 Dataset")
+    col1, col2 = st.sidebar.columns(2)
     
-    # Top categories
-    all_categories = []
+    with col1:
+        st.metric("Papers", f"{len(df):,}")
+    with col2:
+        if 'word_count' in df.columns:
+            st.metric("Avg Words", f"{int(df['word_count'].mean()):,}")
+    
+    all_cats = []
     for cats in df['categories']:
         if isinstance(cats, list):
-            all_categories.extend(cats)
+            all_cats.extend(cats)
     
-    if all_categories:
+    if all_cats:
         from collections import Counter
-        top_cats = Counter(all_categories).most_common(10)
+        top_cats = Counter(all_cats).most_common(5)
         
-        st.sidebar.markdown("**Top Categories:**")
-        for cat, count in top_cats[:5]:
-            percentage = (count / total_papers) * 100
-            st.sidebar.markdown(f"• {cat}: {count:,} ({percentage:.1f}%)")
-
-def create_results_visualization(results: list):
-    """Create visualizations for search results"""
-    if not results:
-        return None, None
+        st.sidebar.markdown("### 🏷️ Top Categories")
+        for cat, count in top_cats:
+            pct = (count / len(df)) * 100
+            st.sidebar.write(f"**{cat}:** {count} ({pct:.1f}%)")
     
-    # Similarity scores distribution
-    scores = [r['similarity_score'] for r in results]
-    
-    fig_scores = px.histogram(
-        x=scores,
-        nbins=20,
-        title="Distribution of Similarity Scores",
-        labels={'x': 'Similarity Score', 'y': 'Count'}
-    )
-    fig_scores.update_layout(showlegend=False)
-    
-    # Category distribution
-    all_categories = []
-    for result in results:
-        all_categories.extend(result.get('categories', []))
-    
-    if all_categories:
-        from collections import Counter
-        cat_counts = Counter(all_categories)
-        
-        fig_categories = px.bar(
-            x=list(cat_counts.values())[:10],
-            y=list(cat_counts.keys())[:10],
-            orientation='h',
-            title="Top Categories in Results",
-            labels={'x': 'Count', 'y': 'Category'}
-        )
-        fig_categories.update_layout(showlegend=False, yaxis={'categoryorder':'total ascending'})
-    else:
-        fig_categories = None
-    
-    return fig_scores, fig_categories
+    if config.ENABLE_INDIVIDUAL_SUMMARIES:
+        st.sidebar.markdown("### 🤖 AI Engine")
+        st.sidebar.success("✅ Active")
+        st.sidebar.write(f"**Model:** {config.OPENAI_MODEL}")
+        cost = config.estimate_cost_per_search()
+        st.sidebar.write(f"**Cost:** ~${cost:.4f}/search")
 
 def search_page():
-    """Main search page with AI summaries"""
-    st.title("🔍 Re-Search with AI Summaries")
-    st.markdown(config.APP_DESCRIPTION)
+    """Enhanced search page with modern design"""
     
-    # Load search engine
+    # Hero section with modern design
+    st.markdown("""
+    <div style="text-align: center; padding: 50px 0 40px;">
+        <h1 style="font-size: 64px; margin-bottom: 15px; font-weight: 900;">
+            PaperPilot
+        </h1>
+        <p style="font-size: 20px; color: #8b5fa8; font-weight: 500; letter-spacing: 0.5px;">
+            Charting Academia's Universe with Zero Turbulence
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     search_engine, error = initialize_search_engine()
     
     if error:
-        st.error(f"❌ Failed to initialize search engine: {error}")
-        st.info("Please make sure you have processed the dataset and built the index.")
+        st.error(f"❌ {error}")
+        st.info("💡 Run: `python main.py process && python main.py build-index`")
         return
     
-    # Search interface
-    col1, col2 = st.columns([0.7, 0.3])
+    # Modern search container
+    st.markdown('<div class="search-container">', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([0.8, 0.2])
     
     with col1:
         query = st.text_input(
-            "🔎 Enter your search query:",
-            placeholder="e.g., machine learning transformers, quantum computing algorithms",
-            help="Use natural language to describe the research topics you're interested in"
+            "Search", 
+            placeholder="e.g., neural networks, quantum computing, deep learning...", 
+            label_visibility="collapsed",
+            key="main_search"
         )
     
     with col2:
-        search_button = st.button("🚀 Search Papers", type="primary", use_container_width=True)
+        search_button = st.button("SEARCH", type="primary", use_container_width=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Advanced options
     with st.expander("⚙️ Advanced Search Options"):
-        col_adv1, col_adv2, col_adv3 = st.columns(3)
+        col_opt1, col_opt2 = st.columns(2)
         
-        with col_adv1:
-            top_k = st.slider("Number of results", 5, 50, config.TOP_K_RESULTS)
-            min_similarity = st.slider("Minimum similarity", 0.0, 1.0, config.SIMILARITY_THRESHOLD, 0.05)
+        with col_opt1:
+            st.markdown("**🎛️ Search Settings**")
+            top_k = st.slider("Number of results", 1, 50, config.TOP_K_RESULTS)
+            min_similarity = st.slider("Minimum similarity (0-1)", 0.0, 1.0, max(0.0, min(1.0, config.SIMILARITY_THRESHOLD)), 0.05)
+            categories = st.multiselect("Filter by categories", ["cs.AI", "cs.LG", "cs.CV", "cs.CL", "cs.RO", "stat.ML", "math.ST", "physics.data-an"])
         
-        with col_adv2:
-            # Category filter
-            available_categories = [
-                "cs.AI", "cs.LG", "cs.CV", "cs.CL", "cs.RO", "cs.NE",
-                "stat.ML", "math.ST", "math.PR", "physics.data-an", "q-bio.QM"
-            ]
-            selected_categories = st.multiselect("Filter by categories:", available_categories)
-        
-        with col_adv3:
-            # AI Summary options
-            generate_summaries = st.checkbox("Generate AI Summaries", 
-                                            value=config.ENABLE_INDIVIDUAL_SUMMARIES,
-                                            help="Generate concise AI summaries for each paper (uses OpenAI API)")
-            ai_overview = st.checkbox("Generate Overall Summary", value=True)
-            export_format = st.selectbox("Export format:", ["None", "JSON", "CSV", "BibTeX"])
+        with col_opt2:
+            st.markdown("**🤖 AI Features**")
+            generate_summaries = st.checkbox("Generate AI Summaries", value=config.ENABLE_INDIVIDUAL_SUMMARIES)
+            if generate_summaries:
+                st.info(f"💰 Estimated cost: ~${config.estimate_cost_per_search():.4f} per search")
+            export_format = st.selectbox("Export format", ["None", "JSON", "CSV", "BibTeX"])
     
-    # Perform search
+    # Find Similar Papers section
+    if st.session_state.get('show_similar') and st.session_state.get('similar_paper_id'):
+        st.markdown("---")
+        st.markdown("### 🔗 Find Similar Papers")
+        
+        col_sim1, col_sim2, col_sim3 = st.columns([0.6, 0.2, 0.2])
+        
+        with col_sim1:
+            st.info(f"Finding papers similar to: **{st.session_state.similar_paper_id}**")
+        
+        with col_sim2:
+            num_similar = st.number_input("Number of similar papers", 1, 20, 5, key="num_sim")
+        
+        with col_sim3:
+            if st.button("🔍 Find Similar", use_container_width=True):
+                try:
+                    df, _ = load_data()
+                    similar_papers = search_engine.get_similar_papers(
+                        st.session_state.similar_paper_id, 
+                        top_k=num_similar
+                    )
+                    
+                    if similar_papers:
+                        results = [paper.to_dict() for paper in similar_papers]
+                        st.session_state.results = results
+                        st.session_state.query = f"Similar to {st.session_state.similar_paper_id}"
+                        st.session_state.show_similar = False
+                        st.rerun()
+                    else:
+                        st.warning("No similar papers found")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+            
+            if st.button("❌ Cancel", use_container_width=True):
+                st.session_state.show_similar = False
+                st.rerun()
+    
+    # Search execution
     if search_button and query.strip():
         with st.spinner("🔍 Searching through research papers..."):
             try:
@@ -405,327 +690,306 @@ def search_page():
                     'generate_summaries': generate_summaries
                 }
                 
-                if selected_categories:
-                    search_kwargs['category_filter'] = selected_categories
+                if categories:
+                    search_kwargs['category_filter'] = categories
                 
-                if ai_overview:
-                    search_results = search_engine.search_with_ai_summary(query, **search_kwargs)
-                    results = search_results['results']
-                    ai_summary_text = search_results['ai_summary']
-                    downloadable_count = search_results.get('downloadable_pdfs', 0)
-                    ai_summaries_count = search_results.get('ai_summaries_count', 0)
-                    estimated_cost = search_results.get('estimated_cost', 0.0)
-                else:
-                    search_results_obj = search_engine.search(query, **search_kwargs)
-                    results = [r.to_dict() for r in search_results_obj]
-                    ai_summary_text = None
-                    downloadable_count = sum(1 for r in results if r.get('pdf_available', False))
-                    ai_summaries_count = sum(1 for r in results if r.get('ai_summary'))
-                    estimated_cost = 0.0
+                search_results = search_engine.search_with_ai_summary(query, **search_kwargs)
+                results = search_results['results']
+                ai_summary = search_results.get('ai_summary')
                 
-                # Store results in session state
-                st.session_state.search_results = results
-                st.session_state.search_query = query
-                st.session_state.ai_summary = ai_summary_text
-                st.session_state.downloadable_count = downloadable_count
-                st.session_state.ai_summaries_count = ai_summaries_count
-                st.session_state.estimated_cost = estimated_cost
-                
+                st.session_state.results = results
+                st.session_state.query = query
+                st.session_state.ai_summary = ai_summary
+                st.session_state.show_similar = False
             except Exception as e:
                 st.error(f"❌ Search failed: {str(e)}")
                 return
     
     # Display results
-    if hasattr(st.session_state, 'search_results'):
-        results = st.session_state.search_results
-        query = st.session_state.search_query
-        ai_summary_text = st.session_state.ai_summary
-        downloadable_count = st.session_state.get('downloadable_count', 0)
-        ai_summaries_count = st.session_state.get('ai_summaries_count', 0)
-        estimated_cost = st.session_state.get('estimated_cost', 0.0)
+    if hasattr(st.session_state, 'results'):
+        results = st.session_state.results
+        query_text = st.session_state.query
         
         if not results:
-            st.warning("🤷 No results found for your query. Try adjusting your search terms or filters.")
+            st.warning("🤷 No results found. Try different keywords or lower the similarity threshold.")
             return
         
-        # Results header with enhanced info
-        col_header1, col_header2 = st.columns([2, 1])
-        
-        with col_header1:
-            st.success(f"✅ Found **{len(results)}** results for: **{query}**")
-            
-            # Enhanced metrics
-            metrics_text = []
-            if downloadable_count > 0:
-                metrics_text.append(f"📄 {downloadable_count} PDFs available")
-            if ai_summaries_count > 0:
-                metrics_text.append(f"🤖 {ai_summaries_count} AI summaries")
-            if estimated_cost > 0:
-                metrics_text.append(f"💰 ~${estimated_cost:.4f} API cost")
-            
-            if metrics_text:
-                st.markdown(" • ".join(metrics_text))
-        
-        with col_header2:
-            # Quick stats
-            if ai_summaries_count > 0:
-                st.metric("AI Summaries", ai_summaries_count, f"{(ai_summaries_count/len(results)*100):.0f}% coverage")
+        # Results header with modern design
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #90c695 0%, #c9a0dc 100%);
+                    color: white; padding: 30px; border-radius: 25px; margin: 30px 0;
+                    text-align: center; box-shadow: 0 15px 45px rgba(201, 160, 220, 0.4);
+                    border: 3px solid rgba(255, 255, 255, 0.3);">
+            <h2 style="margin: 0; font-weight: 900; color: white; font-size: 32px;">
+                ✅ Found {len(results)} Papers
+            </h2>
+            <p style="margin: 15px 0 0 0; opacity: 0.95; font-size: 18px; font-weight: 500;">
+                for query: <em>"{query_text}"</em>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Overall AI Summary
-        if ai_summary_text:
+        if st.session_state.get('ai_summary'):
             st.markdown("### 🧠 AI Research Overview")
-            st.info(ai_summary_text)
+            st.info(st.session_state.ai_summary)
         
-        # Bulk download section
-        st.markdown("### 📦 Bulk Operations")
-        col_bulk1, col_bulk2, col_bulk3 = st.columns([2, 1, 1])
+        # Tabs for organization
+        tab1, tab2, tab3 = st.tabs(["📚 Research Papers", "📊 Analytics", "📦 Bulk Download"])
         
-        with col_bulk1:
-            # Multi-select for bulk download
-            selected_indices = st.multiselect(
-                "Select papers for bulk download:",
-                range(len(results)),
-                format_func=lambda x: f"[{x+1}] {results[x]['title'][:50]}..." if len(results[x]['title']) > 50 else f"[{x+1}] {results[x]['title']}",
-                help="Select multiple papers to download as a single ZIP file"
-            )
+        with tab1:
+            st.markdown(f"<br>", unsafe_allow_html=True)
+            for i, result in enumerate(results):
+                display_search_result(result, i)
         
-        with col_bulk2:
-            if selected_indices and st.button("📦 Create ZIP", use_container_width=True):
-                selected_results = [results[i] for i in selected_indices]
-                zip_result = create_zip_download_streamlit(selected_results)
+        with tab2:
+            st.markdown("### 📊 Search Results Analytics")
+            
+            if len(results) >= 2:
+                # Create visualizations
+                scores = [float(r.get('similarity_score', 0)) for r in results]
+                # Normalize scores if needed
+                scores = [min(s / 10.0 if s > 1.0 else s, 1.0) for s in scores]
                 
-                if zip_result['success']:
-                    st.session_state.zip_download = zip_result
-                    st.success(f"✅ ZIP created ({len(zip_result['successful'])} papers)")
+                # Similarity distribution
+                col_viz1, col_viz2 = st.columns(2)
+                
+                with col_viz1:
+                    fig_scores = go.Figure()
+                    fig_scores.add_trace(go.Histogram(
+                        x=scores,
+                        nbinsx=15,
+                        marker=dict(color='#c9a0dc', line=dict(color='#8b5fa8', width=2)),
+                        hovertemplate='Score: %{x:.3f}<br>Count: %{y}<extra></extra>'
+                    ))
                     
-                    if zip_result['failed']:
-                        st.warning(f"⚠️ {len(zip_result['failed'])} papers failed")
-                        with st.expander("Show failed downloads"):
-                            for failed in zip_result['failed']:
-                                st.text(f"❌ {failed.get('arxiv_id', 'Unknown')}: {failed['error']}")
-                else:
-                    st.error(f"❌ ZIP creation failed: {zip_result['error']}")
-        
-        with col_bulk3:
-            # Show ZIP download button if available
-            if hasattr(st.session_state, 'zip_download'):
-                zip_data = st.session_state.zip_download
-                st.download_button(
-                    label=f"⬇️ Download ZIP ({format_file_size(len(zip_data['data']))})",
-                    data=zip_data['data'],
-                    file_name=zip_data['filename'],
-                    mime="application/zip",
-                    help=f"Download ZIP with {len(zip_data['successful'])} papers",
-                    use_container_width=True
-                )
-        
-        # Visualizations
-        if len(results) > 3:  # Only show charts for meaningful datasets
-            st.markdown("### 📊 Results Analysis")
-            col_viz1, col_viz2 = st.columns(2)
-            
-            fig_scores, fig_categories = create_results_visualization(results)
-            
-            with col_viz1:
-                if fig_scores:
+                    fig_scores.update_layout(
+                        title="Similarity Score Distribution",
+                        plot_bgcolor='rgba(255, 248, 220, 0.3)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#6b4c7a', family='Poppins', size=12),
+                        xaxis=dict(title="Similarity Score (0-1)", gridcolor='rgba(201, 160, 220, 0.2)', range=[0, 1]),
+                        yaxis=dict(title="Count", gridcolor='rgba(201, 160, 220, 0.2)'),
+                        height=350
+                    )
+                    
                     st.plotly_chart(fig_scores, use_container_width=True)
+                
+                with col_viz2:
+                    # Category distribution
+                    all_categories = []
+                    for result in results:
+                        all_categories.extend(result.get('categories', []))
+                    
+                    if all_categories:
+                        from collections import Counter
+                        cat_counts = Counter(all_categories)
+                        top_cats = cat_counts.most_common(8)
+                        
+                        fig_cats = go.Figure()
+                        fig_cats.add_trace(go.Bar(
+                            y=[cat for cat, _ in top_cats],
+                            x=[count for _, count in top_cats],
+                            orientation='h',
+                            marker=dict(
+                                color=['#c9a0dc', '#d4b0e8', '#e8d4f5', '#b88dd4', '#a77cc4', '#9b6fb4', '#8b5fa8', '#7b4f98'][:len(top_cats)]
+                            ),
+                            hovertemplate='%{y}: %{x} papers<extra></extra>'
+                        ))
+                        
+                        fig_cats.update_layout(
+                            title="Top Categories",
+                            plot_bgcolor='rgba(255, 248, 220, 0.3)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            font=dict(color='#6b4c7a', family='Poppins', size=12),
+                            xaxis=dict(title="Count", gridcolor='rgba(201, 160, 220, 0.2)'),
+                            yaxis=dict(title="", gridcolor='rgba(201, 160, 220, 0.2)'),
+                            height=350
+                        )
+                        
+                        st.plotly_chart(fig_cats, use_container_width=True)
+                
+                # Summary statistics
+                st.markdown("#### 📈 Statistics Summary")
+                col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                
+                with col_stat1:
+                    avg_score = np.mean(scores)
+                    st.metric("Average Similarity", f"{avg_score:.3f}")
+                
+                with col_stat2:
+                    max_score = np.max(scores)
+                    st.metric("Highest Score", f"{max_score:.3f}")
+                
+                with col_stat3:
+                    unique_cats = len(set(all_categories))
+                    st.metric("Unique Categories", unique_cats)
+                
+                with col_stat4:
+                    unique_authors = len(set([a for r in results for a in r.get('authors', [])]))
+                    st.metric("Unique Authors", unique_authors)
+            else:
+                st.info("📊 Need at least 2 results to show analytics")
+        
+        with tab3:
+            st.markdown("### 📦 Bulk PDF Download")
+            st.write("Select multiple papers to download as a single ZIP file.")
             
-            with col_viz2:
-                if fig_categories:
-                    st.plotly_chart(fig_categories, use_container_width=True)
+            selected = st.multiselect(
+                "Select papers:",
+                range(len(results)),
+                format_func=lambda x: f"[{x+1}] {results[x]['title'][:65]}..."
+            )
+            
+            col_bulk1, col_bulk2 = st.columns([1, 1])
+            
+            with col_bulk1:
+                if selected and st.button("📦 Create ZIP File", use_container_width=True):
+                    selected_results = [results[i] for i in selected]
+                    zip_result = create_zip_download_streamlit(selected_results)
+                    
+                    if zip_result and zip_result.get('success'):
+                        st.session_state.zip_data = zip_result
+                        st.success(f"✅ ZIP created with {len(zip_result['successful'])} papers!")
+                        
+                        if zip_result['failed']:
+                            with st.expander(f"⚠️ {len(zip_result['failed'])} papers failed"):
+                                for failed in zip_result['failed']:
+                                    st.text(f"❌ {failed.get('title', 'Unknown')[:50]}: {failed['error']}")
+                    else:
+                        st.error(f"❌ {zip_result.get('error', 'Failed to create ZIP')}")
+            
+            with col_bulk2:
+                if hasattr(st.session_state, 'zip_data'):
+                    zip_data = st.session_state.zip_data
+                    st.download_button(
+                        f"⬇️ Download ZIP ({format_file_size(len(zip_data['data']))})",
+                        zip_data['data'],
+                        zip_data['filename'],
+                        "application/zip",
+                        use_container_width=True
+                    )
         
         # Export functionality
         if export_format != "None":
-            search_results_obj = [SearchResult(**{
-                'document_id': r.get('document_id', ''),
-                'title': r.get('title', ''),
-                'abstract': r.get('abstract', ''),
-                'authors': r.get('authors', []),
-                'categories': r.get('categories', []),
-                'similarity_score': r.get('similarity_score', 0.0),
-                'update_date': pd.to_datetime(r['update_date']) if r.get('update_date') else None,
-                'ai_summary': r.get('ai_summary', '')
-            }) for r in results]
-            
-            exported_data = search_engine.export_search_results(search_results_obj, export_format.lower())
-            
-            filename = f"search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format.lower()}"
-            st.download_button(
-                label=f"📁 Download {export_format}",
-                data=exported_data,
-                file_name=filename,
-                mime="text/plain"
-            )
-        
-        # Pagination
-        results_per_page = config.PAGE_SIZE if hasattr(config, 'PAGE_SIZE') else 10
-        total_pages = (len(results) + results_per_page - 1) // results_per_page
-        
-        if total_pages > 1:
-            page = st.selectbox("📄 Page:", list(range(1, total_pages + 1)), key="results_page") - 1
-            start_idx = page * results_per_page
-            end_idx = min(start_idx + results_per_page, len(results))
-        else:
-            start_idx = 0
-            end_idx = len(results)
-        
-        # Display individual results
-        st.markdown("### 📚 Search Results")
-        
-        for i in range(start_idx, end_idx):
-            display_search_result(results[i], i, show_download=True)
-
-# Similar papers and analytics pages remain the same...
-def similar_papers_page():
-    """Similar papers finder page"""
-    st.title("🔗 Find Similar Papers")
-    st.markdown("Enter an ArXiv paper ID to find similar research papers.")
-    
-    # Load search engine
-    search_engine, error = initialize_search_engine()
-    
-    if error:
-        st.error(f"❌ Failed to initialize search engine: {error}")
-        return
-    
-    # Input
-    col1, col2 = st.columns([0.7, 0.3])
-    
-    with col1:
-        paper_id = st.text_input(
-            "ArXiv Paper ID:",
-            placeholder="e.g., 2201.12345, cs.AI/0701123",
-            help="Enter the ArXiv ID of a paper to find similar research"
-        )
-    
-    with col2:
-        col_sub1, col_sub2 = st.columns(2)
-        with col_sub1:
-            top_k = st.number_input("Similar papers:", 1, 20, 5)
-        with col_sub2:
-            with_summaries = st.checkbox("AI Summaries", value=True)
-        find_button = st.button("🔍 Find Similar", type="primary", use_container_width=True)
-    
-    if find_button and paper_id.strip():
-        with st.spinner("🔍 Finding similar papers..."):
             try:
-                # Load data to show original paper
-                df, _ = load_data()
-                original_paper = df[df['id'] == paper_id.strip()]
+                search_results_obj = [SearchResult(**{
+                    'document_id': r.get('document_id', ''),
+                    'title': r.get('title', ''),
+                    'abstract': r.get('abstract', ''),
+                    'authors': r.get('authors', []),
+                    'categories': r.get('categories', []),
+                    'similarity_score': float(r.get('similarity_score', 0)),
+                    'update_date': pd.to_datetime(r['update_date']) if r.get('update_date') else None,
+                    'ai_summary': r.get('ai_summary', '')
+                }) for r in results]
                 
-                if original_paper.empty:
-                    st.error(f"❌ Paper {paper_id} not found in the dataset.")
-                    return
+                exported_data = search_engine.export_search_results(search_results_obj, export_format.lower())
+                filename = f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format.lower()}"
                 
-                # Show original paper
-                original = original_paper.iloc[0]
-                st.markdown("### 📄 Original Paper")
-                
-                with st.container():
-                    st.markdown(f"**[{original['title']}](https://arxiv.org/abs/{original['id']})**")
-                    st.markdown(f"**Categories:** {format_categories(original['categories'], 3)}")
-                    st.markdown(f"**Authors:** {format_authors(original['authors'], 3)}")
-                    
-                    with st.expander("📄 Abstract", expanded=False):
-                        st.markdown(original['abstract'])
-                
-                # Find similar papers
-                similar_papers = search_engine.get_similar_papers(
-                    paper_id.strip(), 
-                    top_k=top_k,
-                    generate_summaries=with_summaries
+                st.download_button(
+                    f"📁 Export as {export_format}",
+                    exported_data,
+                    filename,
+                    "text/plain",
+                    use_container_width=False
                 )
-                
-                if not similar_papers:
-                    st.warning("🤷 No similar papers found.")
-                    return
-                
-                st.markdown(f"### 🔗 {len(similar_papers)} Similar Papers")
-                
-                # Convert to dict format for display
-                results = [paper.to_dict() for paper in similar_papers]
-                
-                for i, result in enumerate(results):
-                    display_search_result(result, i, show_download=True)
-                
             except Exception as e:
-                st.error(f"❌ Failed to find similar papers: {str(e)}")
+                st.error(f"Export failed: {str(e)}")
 
 def analytics_page():
-    """Analytics and insights page (unchanged)"""
-    st.title("📊 Analytics & Insights")
+    """Analytics dashboard"""
+    st.markdown("""
+    <div style="text-align: center; padding: 40px 0;">
+        <h1 style="font-size: 52px; font-weight: 900;">📊 Analytics Dashboard</h1>
+        <p style="font-size: 18px; color: #8b5fa8;">Insights into your research database</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Load data
     df, error = load_data()
-    search_engine, search_error = initialize_search_engine()
     
     if error:
-        st.error(f"❌ Failed to load data: {error}")
+        st.error(f"❌ {error}")
         return
     
-    # Dataset overview
-    st.markdown("### 📈 Dataset Overview")
-    
+    # Elegant metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Total Papers", f"{len(df):,}")
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(201, 160, 220, 0.2), rgba(255, 248, 220, 0.3));
+                    border: 2px solid #c9a0dc; border-radius: 15px; padding: 25px; text-align: center;">
+            <div style="font-size: 42px;">📚</div>
+            <div style="font-size: 32px; font-weight: 900; color: #8b5fa8; margin: 10px 0;">{:,}</div>
+            <div style="font-size: 12px; color: #6b4c7a; font-weight: 600;">TOTAL PAPERS</div>
+        </div>
+        """.format(len(df)), unsafe_allow_html=True)
     
     with col2:
-        avg_words = df['word_count'].mean() if 'word_count' in df.columns else 0
-        st.metric("Avg Words", f"{avg_words:.0f}")
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(201, 160, 220, 0.2), rgba(255, 248, 220, 0.3));
+                    border: 2px solid #d4b0e8; border-radius: 15px; padding: 25px; text-align: center;">
+            <div style="font-size: 42px;">📝</div>
+            <div style="font-size: 32px; font-weight: 900; color: #8b5fa8; margin: 10px 0;">{:,}</div>
+            <div style="font-size: 12px; color: #6b4c7a; font-weight: 600;">AVG WORDS</div>
+        </div>
+        """.format(int(df['word_count'].mean())), unsafe_allow_html=True)
     
     with col3:
-        unique_authors = len(set([author for authors in df['authors'] for author in authors]))
-        st.metric("Unique Authors", f"{unique_authors:,}")
+        authors = set([a for auths in df['authors'] for a in auths])
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(201, 160, 220, 0.2), rgba(255, 248, 220, 0.3));
+                    border: 2px solid #e8d4f5; border-radius: 15px; padding: 25px; text-align: center;">
+            <div style="font-size: 42px;">👥</div>
+            <div style="font-size: 32px; font-weight: 900; color: #8b5fa8; margin: 10px 0;">{:,}</div>
+            <div style="font-size: 12px; color: #6b4c7a; font-weight: 600;">AUTHORS</div>
+        </div>
+        """.format(len(authors)), unsafe_allow_html=True)
     
     with col4:
-        if 'update_date' in df.columns:
-            recent_papers = sum(df['update_date'] > (datetime.now() - timedelta(days=365)))
-            st.metric("Papers (Last Year)", f"{recent_papers:,}")
+        recent = sum(df['update_date'] > (datetime.now() - timedelta(days=365)))
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(144, 198, 149, 0.2), rgba(255, 248, 220, 0.3));
+                    border: 2px solid #90c695; border-radius: 15px; padding: 25px; text-align: center;">
+            <div style="font-size: 42px;">🆕</div>
+            <div style="font-size: 32px; font-weight: 900; color: #8b5fa8; margin: 10px 0;">{:,}</div>
+            <div style="font-size: 12px; color: #6b4c7a; font-weight: 600;">THIS YEAR</div>
+        </div>
+        """.format(recent), unsafe_allow_html=True)
 
 def main():
-    """Main application with AI summary features"""
-    # Sidebar navigation
-    st.sidebar.title("Data Dashboard")
+    """Main application"""
     
-    # Load data for sidebar stats
+    # Initialize session state
+    if 'show_similar' not in st.session_state:
+        st.session_state.show_similar = False
+    
     df, error = load_data()
     if df is not None:
-        display_statistics_sidebar(df)
-        display_ai_summary_stats()  # New AI summary stats
+        display_sidebar_stats(df)
     
-    # Navigation
+    st.sidebar.markdown("---")
+    
     pages = {
         "🔍 Search Papers": search_page,
-        "🔗 Similar Papers": similar_papers_page,
         "📊 Analytics": analytics_page
     }
     
-    selected_page = st.sidebar.selectbox("Navigate to:", list(pages.keys()))
+    selected = st.sidebar.radio("Navigation", list(pages.keys()), label_visibility="collapsed")
     
-    # System info in sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### ⚙️ System Info")
-    st.sidebar.markdown(f"**Model:** {config.EMBEDDING_MODEL}")
-    st.sidebar.markdown(f"**Index Type:** {config.FAISS_INDEX_TYPE}")
+    pages[selected]()
     
-    # Configuration validation
-    if config.USE_OPENAI and not config.OPENAI_API_KEY:
-        st.sidebar.error("⚠️ OpenAI API key not configured")
-        st.sidebar.markdown("Add your key to `.env` file")
-    
-    # Run selected page
-    pages[selected_page]()
-    
-    # Footer
-    st.markdown("---")
-    st.markdown(
-        "<div style='text-align: center; color: #666;'>"
-        "Enhanced with AI Summaries • Built with Streamlit • Data from ArXiv • Powered by FAISS & OpenAI"
-        "</div>", 
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <div style="text-align: center; padding: 35px; margin-top: 60px; 
+                border-top: 3px solid rgba(201, 160, 220, 0.3);">
+        <p style="color: #8b5fa8; font-size: 15px; font-weight: 600; margin: 0;">
+            🚀 Powered by <strong>FAISS</strong> • <strong>OpenAI</strong> • <strong>Streamlit</strong>
+        </p>
+        <p style="color: rgba(107, 76, 122, 0.6); font-size: 13px; margin: 12px 0 0 0;">
+            Made with ❤️ for researchers worldwide
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
