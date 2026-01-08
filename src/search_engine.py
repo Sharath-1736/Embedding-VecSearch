@@ -485,6 +485,7 @@ class ArXivSearchEngine:
     
     def search(self, query: str, top_k: int = None, min_similarity: float = None, 
                category_filter: List[str] = None, date_filter: Dict = None,
+               year_filter: List[int] = None,
                generate_summaries: bool = None, use_reranking: bool = None,
                use_query_expansion: bool = True) -> List[SearchResult]:
         """
@@ -596,6 +597,11 @@ class ArXivSearchEngine:
                 if doc_date and not self._passes_date_filter(doc_date, date_filter):
                     continue
             
+            if year_filter:
+                doc_year = doc_data.get('year')
+                if doc_year is None or int(doc_year) not in year_filter:
+                    continue
+                
             # Generate AI summary if enabled
             ai_summary = None
             if (generate_summaries and 

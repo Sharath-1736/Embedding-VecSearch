@@ -634,6 +634,28 @@ def search_page():
             st.markdown("**🎛️ Search Settings**")
             top_k = st.slider("Number of results", 1, 50, config.TOP_K_RESULTS)
             min_similarity = st.slider("Minimum similarity (0-1)", 0.0, 1.0, max(0.0, min(1.0, config.SIMILARITY_THRESHOLD)), 0.05)
+            st.markdown("**📅 Publication Year**")
+            df, _ = load_data()
+    
+            if df is not None and 'year' in df.columns:
+                years_available = df['year'].dropna()
+                if len(years_available) > 0:
+                    min_year = int(years_available.min())
+                    max_year = int(years_available.max())
+            
+                    year_range = st.slider(
+                        "Select year range",
+                        min_value=min_year,
+                        max_value=max_year,
+                        value=(min_year, max_year),
+                        step=1
+                    )
+                    selected_years = list(range(year_range[0], year_range[1] + 1))
+                    st.caption(f"Selected: {year_range[0]} - {year_range[1]}")
+                else:
+                    selected_years = None
+            else:
+                selected_years = None
             categories = st.multiselect("Filter by categories", ["cs.AI", "cs.LG", "cs.CV", "cs.CL", "cs.RO", "stat.ML", "math.ST", "physics.data-an"])
         
         with col_opt2:
@@ -687,7 +709,8 @@ def search_page():
                 search_kwargs = {
                     'top_k': top_k,
                     'min_similarity': min_similarity,
-                    'generate_summaries': generate_summaries
+                    'generate_summaries': generate_summaries,
+                    'year_filter': selected_years
                 }
                 
                 if categories:

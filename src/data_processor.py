@@ -371,16 +371,19 @@ class ArXivDataProcessor:
         # Extract categories
         categories = self.extract_categories(paper.get('categories', ''))
         
-        # Parse date
+        # Parse date AND extract year
         update_date = paper.get('update_date', '')
         parsed_date = None
+        year = None  
+
         if update_date:
             try:
                 parsed_date = datetime.strptime(update_date, '%Y-%m-%d')
+                year = parsed_date.year  
             except (ValueError, TypeError):
-                # Try alternative date formats
                 try:
                     parsed_date = datetime.strptime(update_date[:10], '%Y-%m-%d')
+                    year = parsed_date.year if parsed_date else None  
                 except:
                     pass
         
@@ -396,6 +399,7 @@ class ArXivDataProcessor:
             'authors': authors,
             'categories': categories,
             'update_date': parsed_date,
+            'year': year,
             'submitter': paper.get('submitter', ''),
             'doi': paper.get('doi', ''),
             'journal_ref': paper.get('journal-ref', ''),
