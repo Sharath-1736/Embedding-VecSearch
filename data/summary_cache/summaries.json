@@ -88,5 +88,25 @@
     "summary": "We present an analysis of the percolation transition for general node removal strategies valid for locally tree-like directed networks.",
     "timestamp": "2025-11-03T11:35:58.123028",
     "title": "Weighted percolation on directed networks"
+  },
+  "aeb84b96dd046aa26e186ee69eb958fd": {
+    "summary": "A quantum computer is a machine that can perform certain calculations much faster than a classical computer by using the laws of quantum mechanics.",
+    "timestamp": "2026-01-09T08:20:32.901965",
+    "title": "Lecture notes on Optical Quantum Computing"
+  },
+  "008d4b914c0d1f75024f657ef9da18ad": {
+    "summary": "This paper overviews the basic principles and recent advances in the emerging field of Quantum Computation (QC), highlighting its potential application to Artificial Intelligence (AI).",
+    "timestamp": "2026-01-09T08:20:33.378752",
+    "title": "The Road to Quantum Artificial Intelligence"
+  },
+  "3a0792ce9431f6057e82707c2f38432e": {
+    "summary": "The recent debate on hypercomputation has arisen new questions both on the computational abilities of quantum systems and the Church-Turing Thesis role in Physics.",
+    "timestamp": "2026-01-09T08:20:33.833249",
+    "title": "Effective Physical Processes and Active Information in Quantum Computing"
+  },
+  "b4c6a420cec4b9ede2cd8a88c2c4512c": {
+    "summary": "We present a novel automated technique for parallelizing quantum circuits via forward and backward translation to measurement-based quantum computing ...",
+    "timestamp": "2026-01-09T08:20:34.223152",
+    "title": "Parallelizing Quantum Circuits"
   }
 }
